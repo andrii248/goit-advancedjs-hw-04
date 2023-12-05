@@ -2,7 +2,8 @@ import RequestPictures from './js/requestToPixabay';
 import LoadMoreImgsBtn from './js/loadMoreImgs';
 import SimpleLightbox from 'simplelightbox';
 import 'simplelightbox/dist/simple-lightbox.min.css';
-import { Notify } from 'notiflix/build/notiflix-notify-aio';
+import iziToast from 'izitoast';
+import 'izitoast/dist/css/iziToast.min.css';
 
 const userRequest = new RequestPictures();
 const loadMoreBtn = new LoadMoreImgsBtn({
@@ -18,33 +19,47 @@ const refs = {
   form: document.querySelector('#search-form'),
   searchBtn: document.querySelector('.search-btn'),
   gallery: document.querySelector('.gallery'),
+  loader: document.querySelector('.loader'),
 };
 
 refs.form.addEventListener('submit', onSearchSubmit);
 loadMoreBtn.refs.loadBtn.addEventListener('click', onLoadBtnClick);
 refs.gallery.addEventListener('click', onImgClick);
 
-
-function onSearchSubmit(evt) {
+async function onSearchSubmit(evt) {
   evt.preventDefault();
-
   const searchData = evt.target.elements.searchQuery.value.trim();
   userRequest.query = searchData;
 
   if (searchData === '') {
-    Notify.failure(
-      'Sorry, there are no images matching your search query. Please try again.'
-    );
+    iziToast.error({
+      title: 'Error',
+      message: 'Empty input. Please, enter your query to search',
+      position: 'topRight',
+    });
+
     return;
   }
-
   clearGalleryContainer();
   userRequest.resetPage();
-  fetchAndRenderImgs().then(data => {
-    const totalImgsFound = Number(data.totalHits);
-    Notify.success(`Hooray! We found ${totalImgsFound} images.`);
-  });
-  evt.target.reset();
+  showLoader();
+
+  try {
+    const fetchImgs = await fetchAndRenderImgs();
+    const totalImgsFound = fetchImgs.totalHits;
+
+    totalImgsFound &&
+      iziToast.success({
+        title: 'Hooray!',
+        message: `We found ${totalImgsFound} images`,
+        position: 'topRight',
+      });
+
+    evt.target.reset();
+    hideLoader();
+  } catch (error) {
+    console.log(error);
+  }
 }
 
 function clearGalleryContainer() {
@@ -52,46 +67,71 @@ function clearGalleryContainer() {
 }
 
 async function fetchAndRenderImgs() {
+  showLoader();
   try {
-    loadMoreBtn.show();
+    loadMoreBtn.hide();
+
     loadMoreBtn.disable();
+
     const fetchData = await userRequest.fetchPictures();
     const images = fetchData.hits;
     const totalImgsFound = fetchData.totalHits;
 
     if (totalImgsFound === 0) {
-      Notify.failure(
-        'Sorry, there are no images matching your search query. Please try again.'
-      );
+      iziToast.error({
+        title: 'Error',
+        message:
+          'Sorry, there are no images matching your search query. Please try again.',
+        position: 'topRight',
+      });
       loadMoreBtn.hide();
       return;
     }
+
     if (totalImgsFound < 40) {
+      iziToast.info({
+        title: 'Info',
+        message: "We're sorry, but you've reached the end of search results.",
+        position: 'topRight',
+      });
       loadMoreBtn.hide();
+    } else {
+      loadMoreBtn.show();
+      loadMoreBtn.enable();
     }
 
     renderImages(images);
     userRequest.incrementPage();
     lightbox.refresh();
-    loadMoreBtn.enable();
 
     return fetchData;
   } catch (error) {
-    Notify.failure(`${error.message}`);
+    console.log(error);
+  } finally {
+    hideLoader();
   }
 }
 
-function onLoadBtnClick() {
-  fetchAndRenderImgs().then(data => {
+async function onLoadBtnClick() {
+  showLoader();
+  try {
+    const loadMore = await fetchAndRenderImgs();
+
     const currentPage = userRequest.page;
-    const totalPages = Math.ceil(Number(data.totalHits) / 40);
+    const totalPages = Math.ceil(Number(loadMore.totalHits) / 40);
     if (currentPage > totalPages) {
-      Notify.warning(
-        "We're sorry, but you've reached the end of search results."
-      );
+      iziToast.info({
+        title: 'Info',
+        message: "We're sorry, but you've reached the end of search results.",
+        position: 'topRight',
+      });
+
       loadMoreBtn.hide();
     }
-  });
+    hideLoader();
+  } catch (error) {
+    console.log(error);
+  }
 }
 
 function renderImages(images) {
@@ -121,4 +161,12 @@ function renderImages(images) {
 
 function onImgClick(evt) {
   if (evt.target.nodeName !== 'IMG') return;
+}
+
+function showLoader() {
+  refs.loader.classList.remove('is-hidden');
+}
+
+function hideLoader() {
+  refs.loader.classList.add('is-hidden');
 }
