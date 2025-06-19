@@ -1,3 +1,4 @@
+import './css/styles.css';
 import iziToast from 'izitoast';
 import 'izitoast/dist/css/iziToast.min.css';
 import { fetchImages, getCurrentPage, nextPage } from './js/pixabay-api';
