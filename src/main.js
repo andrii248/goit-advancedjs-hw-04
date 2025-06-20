@@ -1,9 +1,19 @@
 import './css/styles.css';
 import iziToast from 'izitoast';
 import 'izitoast/dist/css/iziToast.min.css';
-import { fetchImages, getCurrentPage, nextPage } from './js/pixabay-api';
+import {
+  fetchImages,
+  getCurrentPage,
+  getTotalPages,
+  nextPage,
+  resetPage,
+} from './js/pixabay-api';
 import { clearGallery, renderGalley } from './js/render-functions';
-import { handleLoadMore, showLoadMore } from './js/helpers/load-more';
+import {
+  handleLoadMore,
+  hideLoadMore,
+  showLoadMore,
+} from './js/helpers/load-more';
 import { hideLoader, showLoader } from './js/helpers/loader';
 
 const refs = {
@@ -17,6 +27,7 @@ let userQuery = '';
 
 refs.searchForm.addEventListener('submit', async evt => {
   evt.preventDefault();
+  hideLoadMore();
 
   userQuery = evt.currentTarget.elements.search.value.trim();
 
@@ -29,7 +40,10 @@ refs.searchForm.addEventListener('submit', async evt => {
     return;
   }
 
+  resetPage();
+
   clearGallery(refs.gallery);
+
   showLoader();
 
   try {
@@ -47,8 +61,14 @@ refs.searchForm.addEventListener('submit', async evt => {
     }
 
     renderGalley(data.hits, refs.gallery);
-    nextPage();
-    showLoadMore();
+
+    const totalPages = getTotalPages();
+    const currentPage = getCurrentPage();
+
+    if (totalPages > currentPage) {
+      nextPage();
+      showLoadMore();
+    }
   } catch (err) {
     iziToast.error({
       title: 'Error',
